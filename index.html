@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Pentaksiran – DFN40543 Enterprise Network</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; background: #f0f4f8; color: #1f2328; font-size: 14px; }
+
+    /* ── HEADER ── */
+    header {
+      background: linear-gradient(135deg, #1a3a5c 0%, #2563a8 100%);
+      color: #fff; padding: 20px 32px 16px;
+    }
+    header .inst { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; opacity: .75; }
+    header h1 { font-size: 20px; font-weight: 700; margin: 4px 0 2px; }
+    header .meta { font-size: 12px; opacity: .8; display: flex; gap: 20px; flex-wrap: wrap; margin-top: 6px; }
+    header .meta span::before { content: "▸ "; }
+    header .top-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    header .title-block { flex: 1; min-width: 200px; }
+
+    /* ── REPORT BUTTONS ── */
+    .report-btns { display: flex; gap: 8px; flex-shrink: 0; margin-top: 4px; }
+    .report-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid rgba(255,255,255,.45); background: rgba(255,255,255,.12);
+      color: #fff; white-space: nowrap; transition: background .18s, border-color .18s;
+    }
+    .report-btn:hover { background: rgba(255,255,255,.25); border-color: rgba(255,255,255,.8); }
+    .report-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .report-btn .icon { font-size: 14px; }
+
+    /* ── PRINT STYLES ── */
+    @media print {
+      body { background: #fff; font-size: 12px; }
+      header { background: #1a3a5c !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 14px 20px; }
+      .report-btns { display: none !important; }
+      .tabs { display: none !important; }
+      #chatbot-toggle, #chatbot-window { display: none !important; }
+      footer { display: none; }
+      .tab-panel { display: block !important; page-break-after: always; }
+      .tab-panel:last-child { page-break-after: avoid; }
+      .content { padding: 12px 16px; }
+      .chart-wrap, .chart-wrap.tall, .chart-wrap.short { height: 200px !important; }
+      .kpi-row { grid-template-columns: repeat(5, 1fr); }
+      .chart-row { grid-template-columns: 1fr 1fr; }
+      table { font-size: 10px; }
+      thead th { background: #1a3a5c !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    /* ── TABS ── */
+    .tabs { background: #fff; border-bottom: 2px solid #e5e7eb; display: flex; overflow-x: auto; padding: 0 24px; }
+    .tab-btn {
+      padding: 14px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+      border: none; background: none; color: #57606a; white-space: nowrap;
+      border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all .2s;
+    }
+    .tab-btn:hover { color: #2563a8; }
+    .tab-btn.active { color: #2563a8; border-bottom-color: #2563a8; }
+
+    /* ── CONTENT ── */
+    .content { padding: 24px 32px; max-width: 1200px; margin: 0 auto; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── KPI CARDS ── */
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .kpi-card {
+      background: #fff; border-radius: 10px; padding: 18px 20px;
+      border-left: 4px solid #2563a8; box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .kpi-card .label { font-size: 11px; color: #57606a; text-transform: uppercase; letter-spacing: .8px; }
+    .kpi-card .value { font-size: 28px; font-weight: 700; color: #1a3a5c; margin-top: 4px; }
+    .kpi-card .sub { font-size: 11px; color: #57606a; margin-top: 2px; }
+    .kpi-card.green { border-left-color: #16a34a; }
+    .kpi-card.orange { border-left-color: #ea580c; }
+    .kpi-card.purple { border-left-color: #7c3aed; }
+
+    /* ── CHART CARDS ── */
+    .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; margin-bottom: 24px; }
+    .chart-card {
+      background: #fff; border-radius: 10px; padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .chart-card h3 { font-size: 13px; font-weight: 600; color: #1a3a5c; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; }
+    .chart-wrap { position: relative; height: 260px; }
+    .chart-wrap.tall { height: 320px; }
+    .chart-wrap.short { height: 200px; }
+
+    /* ── TABLE ── */
+    .table-card { background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); overflow-x: auto; }
+    .table-card h3 { font-size: 13px; font-weight: 600; color: #1a3a5c; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { background: #1a3a5c; color: #fff; padding: 10px 12px; text-align: center; font-weight: 600; white-space: nowrap; }
+    thead th:first-child, thead th:nth-child(2) { text-align: left; }
+    tbody tr:nth-child(even) { background: #f7f8fa; }
+    tbody td { padding: 9px 12px; border-bottom: 1px solid #e5e7eb; text-align: center; white-space: nowrap; }
+    tbody td:nth-child(2) { text-align: left; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── BADGES ── */
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+    .badge-A  { background: #dcfce7; color: #15803d; }
+    .badge-B  { background: #dbeafe; color: #1d4ed8; }
+    .badge-C  { background: #fef9c3; color: #a16207; }
+    .badge-D  { background: #ffedd5; color: #c2410c; }
+    .badge-E  { background: #fee2e2; color: #b91c1c; }
+    .rank-medal { font-size: 18px; }
+
+    /* ── RANKING ── */
+    .rank-row { display: flex; align-items: center; background: #fff; border-radius: 8px;
+                padding: 12px 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+                border-left: 4px solid #e5e7eb; }
+    .rank-row.top1 { border-left-color: #f59e0b; }
+    .rank-row.top2 { border-left-color: #94a3b8; }
+    .rank-row.top3 { border-left-color: #b45309; }
+    .rank-row.low  { border-left-color: #ef4444; }
+    .rank-num  { font-size: 20px; font-weight: 800; color: #1a3a5c; width: 36px; }
+    .rank-name { flex: 1; font-weight: 600; }
+    .rank-no   { font-size: 11px; color: #57606a; }
+    .rank-score { font-size: 22px; font-weight: 800; color: #2563a8; min-width: 60px; text-align: right; }
+
+    /* ── CLO BARS ── */
+    .clo-item { margin-bottom: 18px; }
+    .clo-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; font-weight: 600; }
+    .clo-bar-bg { background: #e5e7eb; border-radius: 999px; height: 18px; overflow: hidden; }
+    .clo-bar-fill { height: 100%; border-radius: 999px; display: flex; align-items: center; padding-left: 10px; color: #fff; font-size: 11px; font-weight: 700; transition: width .6s ease; }
+
+    /* ── SECTION TITLE ── */
+    .section-title { font-size: 15px; font-weight: 700; color: #1a3a5c; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #2563a8; display: inline-block; }
+
+    /* ── FOOTER ── */
+    footer { text-align: center; font-size: 11px; color: #57606a; padding: 24px 16px 16px; border-top: 1px solid #e5e7eb; margin-top: 32px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="inst">Politeknik Balik Pulau &nbsp;|&nbsp; Jabatan Teknologi Maklumat dan Komunikasi</div>
+  <div class="top-row">
+    <div class="title-block">
+      <h1>📊 Dashboard Pentaksiran Berterusan</h1>
+      <div class="meta">
+        <span>DFN40543 – Enterprise Network</span>
+        <span>Seksyen: S5</span>
+        <span>Program: DIT</span>
+        <span>Sesi: II / 2025–2026</span>
+        <span>Pensyarah: Shahrul Nazmi Bin Ismail</span>
+      </div>
+    </div>
+    <div class="report-btns">
+      <button class="report-btn" onclick="doPrint()" title="Cetak kesemua tab dashboard">
+        <span class="icon">🖨️</span> Print
+      </button>
+      <button class="report-btn" id="btnPng" onclick="doExportPNG()" title="Simpan paparan semasa sebagai imej PNG">
+        <span class="icon">📸</span> PNG
+      </button>
+      <button class="report-btn" id="btnPdf" onclick="doExportPDF()" title="Jana laporan PDF kesemua tab">
+        <span class="icon">📄</span> PDF
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('ringkasan',this)">🏠 Ringkasan</button>
+  <button class="tab-btn" onclick="showTab('komponen',this)">🎯 Komponen Penilaian</button>
+  <button class="tab-btn" onclick="showTab('prestasi',this)">👨‍🎓 Prestasi Pelajar</button>
+  <button class="tab-btn" onclick="showTab('clo',this)">📊 Analisis CLO</button>
+  <button class="tab-btn" onclick="showTab('ranking',this)">🏆 Ranking</button>
+  <button class="tab-btn" onclick="showTab('gred',this)">📉 Taburan Gred</button>
+</div>
+
+<div class="content">
+
+  <!-- ══════════════ TAB 1: RINGKASAN ══════════════ -->
+  <div id="tab-ringkasan" class="tab-panel active">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="label">Jumlah Pelajar</div>
+        <div class="value">10</div>
+        <div class="sub">Seksyen S5</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="label">Purata Markah</div>
+        <div class="value">82.6</div>
+        <div class="sub">daripada 100</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="label">Lulus (≥50%)</div>
+        <div class="value">10</div>
+        <div class="sub">100% pelajar</div>
+      </div>
+      <div class="kpi-card orange">
+        <div class="label">Markah Tertinggi</div>
+        <div class="value">90</div>
+        <div class="sub">2 pelajar</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="label">Markah Terendah</div>
+        <div class="value">75</div>
+        <div class="sub">2 pelajar</div>
+      </div>
+    </div>
+
+    <div class="chart-row">
+      <div class="chart-card" style="grid-column: 1 / -1;">
+        <h3>📊 Purata Markah setiap Komponen Penilaian</h3>
+        <div class="chart-wrap short">
+          <canvas id="chartRingkasan"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>✅ Status Pencapaian ≥50% per Komponen</h3>
+        <div class="chart-wrap short">
+          <canvas id="chartLulus"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>📈 Jumlah Markah (CA 70%) – Semua Pelajar</h3>
+        <div class="chart-wrap short">
+          <canvas id="chartCA"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ TAB 2: KOMPONEN ══════════════ -->
+  <div id="tab-komponen" class="tab-panel">
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>🍩 Agihan Peratusan Penilaian (Weightage)</h3>
+        <div class="chart-wrap">
+          <canvas id="chartPie"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>📊 Purata Markah setiap Komponen (dari skor penuh)</h3>
+        <div class="chart-wrap">
+          <canvas id="chartKomponen"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>📋 Ringkasan Komponen Penilaian</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Komponen</th>
+            <th>CLO</th>
+            <th>Weightage</th>
+            <th>Skor Penuh</th>
+            <th>Purata Markah</th>
+            <th>Lulus ≥50%</th>
+            <th>Gagal &lt;50%</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td style="text-align:left">Practical Work 1</td><td>CLO0101P</td><td>-</td><td>25</td><td>22.4</td><td><span class="badge badge-A">10</span></td><td><span class="badge badge-E">0</span></td></tr>
+          <tr><td>2</td><td style="text-align:left">Practical Work 2</td><td>CLO0101P</td><td>-</td><td>25</td><td>20.0</td><td><span class="badge badge-A">10</span></td><td><span class="badge badge-E">0</span></td></tr>
+          <tr><td>3</td><td style="text-align:left">Practical Work 3</td><td>CLO0101P</td><td>30%</td><td>25</td><td>23.8</td><td><span class="badge badge-A">10</span></td><td><span class="badge badge-E">0</span></td></tr>
+          <tr><td>4</td><td style="text-align:left">Presentation 1</td><td>CLO0102A</td><td>10%</td><td>25</td><td>21.4</td><td><span class="badge badge-A">10</span></td><td><span class="badge badge-E">0</span></td></tr>
+          <tr><td>5</td><td style="text-align:left">Case Study 1</td><td>CLO0101P</td><td>15%</td><td>50</td><td>34.0</td><td><span class="badge badge-B">8</span></td><td><span class="badge badge-D">2</span></td></tr>
+          <tr><td>6</td><td style="text-align:left">Problem Based Assignment 1</td><td>CLO0103A</td><td>15%</td><td>25</td><td>20.0</td><td><span class="badge badge-A">10</span></td><td><span class="badge badge-E">0</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════ TAB 3: PRESTASI PELAJAR ══════════════ -->
+  <div id="tab-prestasi" class="tab-panel">
+    <div class="table-card" style="margin-bottom:20px;">
+      <h3>👨‍🎓 Rekod Markah Semua Pelajar</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Nama Pelajar</th>
+            <th>No. Matrik</th>
+            <th>PW1<br/>/25</th>
+            <th>PW2<br/>/25</th>
+            <th>PW3<br/>/25</th>
+            <th>PR1<br/>/25</th>
+            <th>CS1<br/>/50</th>
+            <th>PBA1<br/>/25</th>
+            <th>CA<br/>/70</th>
+            <th>Total<br/>/100</th>
+            <th>Gred</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyPrestasi"></tbody>
+      </table>
+    </div>
+    <div class="chart-card">
+      <h3>📊 Perbandingan Jumlah Markah setiap Pelajar (/100)</h3>
+      <div class="chart-wrap tall">
+        <canvas id="chartPelajar"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ TAB 4: CLO ══════════════ -->
+  <div id="tab-clo" class="tab-panel">
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>📊 % Pencapaian setiap CLO (pelajar ≥50%)</h3>
+        <div class="chart-wrap">
+          <canvas id="chartCLO"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>📋 Maklumat CLO</h3>
+        <div style="padding:8px 0;">
+          <div class="clo-item">
+            <div class="clo-label"><span>CLO0101P – Practical Work (PW1+PW2+PW3)</span><span>100%</span></div>
+            <div class="clo-bar-bg"><div class="clo-bar-fill" style="width:100%;background:#2563a8;">10/10 pelajar</div></div>
+          </div>
+          <div class="clo-item">
+            <div class="clo-label"><span>CLO0102A – Presentation</span><span>100%</span></div>
+            <div class="clo-bar-bg"><div class="clo-bar-fill" style="width:100%;background:#16a34a;">10/10 pelajar</div></div>
+          </div>
+          <div class="clo-item">
+            <div class="clo-label"><span>CLO0101P – Case Study (Practical)</span><span>80%</span></div>
+            <div class="clo-bar-bg"><div class="clo-bar-fill" style="width:80%;background:#ea580c;">8/10 pelajar</div></div>
+          </div>
+          <div class="clo-item">
+            <div class="clo-label"><span>CLO0103A – Problem Based Assignment</span><span>100%</span></div>
+            <div class="clo-bar-bg"><div class="clo-bar-fill" style="width:100%;background:#7c3aed;">10/10 pelajar</div></div>
+          </div>
+        </div>
+        <div style="margin-top:16px; padding:12px; background:#fef9c3; border-radius:8px; border-left:4px solid #f59e0b;">
+          <strong>⚠️ Perhatian:</strong> CLO0101P (Case Study) – 2 pelajar tidak mencapai ≥50%.
+          Pelajar: <strong>EIRFAN RAZIQ</strong> &amp; <strong>UWAIS BIN MOHD IMRAN</strong> (masing-masing 24/50).
+        </div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-top:4px;">
+      <h3>📊 Markah Case Study setiap Pelajar (komponen paling mencabar)</h3>
+      <div class="chart-wrap short">
+        <canvas id="chartCSDetail"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ TAB 5: RANKING ══════════════ -->
+  <div id="tab-ranking" class="tab-panel">
+    <div class="chart-row">
+      <div style="flex:1; min-width:280px;">
+        <div class="section-title">🏆 Senarai Ranking Pelajar</div>
+        <div id="rankingList"></div>
+      </div>
+      <div class="chart-card" style="flex:1; min-width:300px;">
+        <h3>📊 Markah Semua Pelajar (Disusun)</h3>
+        <div class="chart-wrap tall">
+          <canvas id="chartRanking"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ TAB 6: TABURAN GRED ══════════════ -->
+  <div id="tab-gred" class="tab-panel">
+    <div class="kpi-row">
+      <div class="kpi-card green">
+        <div class="label">Gred A (80–100)</div>
+        <div class="value">6</div>
+        <div class="sub">60% pelajar</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Gred B (70–79)</div>
+        <div class="value">2</div>
+        <div class="sub">20% pelajar</div>
+      </div>
+      <div class="kpi-card orange">
+        <div class="label">Gred C (60–69)</div>
+        <div class="value">0</div>
+        <div class="sub">0% pelajar</div>
+      </div>
+      <div class="kpi-card orange">
+        <div class="label">Gred D (50–59)</div>
+        <div class="value">2</div>
+        <div class="sub">20% pelajar</div>
+      </div>
+      <div class="kpi-card" style="border-left-color:#ef4444;">
+        <div class="label">Gred E (&lt;50)</div>
+        <div class="value">0</div>
+        <div class="sub">0% pelajar</div>
+      </div>
+    </div>
+
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>📊 Taburan Gred – Bilangan Pelajar</h3>
+        <div class="chart-wrap">
+          <canvas id="chartGred"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>🍩 Peratusan Gred</h3>
+        <div class="chart-wrap">
+          <canvas id="chartGredPie"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <h3>📋 Semak Gred Semua Pelajar</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Nama Pelajar</th>
+            <th>Markah /100</th>
+            <th>Gred</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyGred"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /.content -->
+
+<footer>
+  Rekod Pentaksiran Berterusan &nbsp;|&nbsp; DFN40543 Enterprise Network &nbsp;|&nbsp; Politeknik Balik Pulau &nbsp;|&nbsp; Sesi II 2025/2026
+  <br/><br/>
+  <span style="color:#aaa;">Made with IBM Bob</span>
+</footer>
+
+<script>
+// ═══════════════ DATA ═══════════════
+const students = [
+  { no:1,  matric:"21DIT23F2003", name:"Amirul Danish Hakimi Bin Abdul Mutalib",    sek:"S5A", pw1:23, pw2:18, pw3:24, pr1:21, cs1:24, pba1:20, ca:54, total:77 },
+  { no:2,  matric:"21DIT23F2007", name:"Muhammad Khairil Haziq Bin Muhammad Rizal", sek:"S5A", pw1:23, pw2:18, pw3:24, pr1:21, cs1:24, pba1:20, ca:54, total:77 },
+  { no:3,  matric:"21DIT23F2011", name:"Alif Haikal Bin Mohamad Azhar",             sek:"S5A", pw1:24, pw2:17, pw3:24, pr1:21, cs1:27, pba1:20, ca:55, total:78 },
+  { no:4,  matric:"21DIT23F2018", name:"Eirfan Raziq Bin Zahari",                   sek:"S5A", pw1:18, pw2:18, pw3:24, pr1:21, cs1:27, pba1:20, ca:53, total:75 },
+  { no:5,  matric:"21DIT23F2032", name:"Vagish Thevar A/L Subramaniam",             sek:"S5A", pw1:24, pw2:23, pw3:24, pr1:22, cs1:46, pba1:20, ca:63, total:90 },
+  { no:6,  matric:"21DIT23F2041", name:"Uwais Bin Mohd Imran",                      sek:"S5A", pw1:18, pw2:19, pw3:23, pr1:21, cs1:27, pba1:20, ca:53, total:75 },
+  { no:7,  matric:"21DIT23F2013", name:"Ahmad Ammar Anaqi Bin Abdul Musarwair",     sek:"S5B", pw1:24, pw2:19, pw3:23, pr1:21, cs1:27, pba1:20, ca:55, total:78 },
+  { no:8,  matric:"21DIT23F2019", name:"Muhammad Syful Azveen Bin Muhammad Joseph", sek:"S5B", pw1:23, pw2:23, pw3:24, pr1:22, cs1:46, pba1:20, ca:63, total:89 },
+  { no:9,  matric:"21DIT23F2023", name:"Kugaann A/L Subramaniam",                   sek:"S5B", pw1:24, pw2:23, pw3:24, pr1:22, cs1:46, pba1:20, ca:63, total:90 },
+  { no:10, matric:"21DIT23F2024", name:"Vibhushan A/L Muthu Ramu",                  sek:"S5B", pw1:23, pw2:22, pw3:24, pr1:22, cs1:46, pba1:20, ca:62, total:89 },
+];
+
+function getGrade(m) {
+  if (m >= 80) return "A";
+  if (m >= 70) return "B";
+  if (m >= 60) return "C";
+  if (m >= 50) return "D";
+  return "E";
+}
+function getStatus(m) {
+  if (m >= 80) return { text:"Cemerlang", cls:"badge-A" };
+  if (m >= 70) return { text:"Baik", cls:"badge-B" };
+  if (m >= 60) return { text:"Memuaskan", cls:"badge-C" };
+  if (m >= 50) return { text:"Lulus", cls:"badge-D" };
+  return { text:"Gagal", cls:"badge-E" };
+}
+
+// ═══════════════ TABS ═══════════════
+function showTab(id, btn) {
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("tab-" + id).classList.add("active");
+  btn.classList.add("active");
+}
+
+// ═══════════════ CHARTS ═══════════════
+const COLORS = ["#2563a8","#16a34a","#ea580c","#7c3aed","#0891b2","#d97706","#db2777","#64748b","#15803d","#9333ea"];
+const LIGHT   = ["#dbeafe","#dcfce7","#ffedd5","#ede9fe","#cffafe","#fef3c7","#fce7f3","#f1f5f9","#bbf7d0","#f3e8ff"];
+
+// Tab 1 – Ringkasan
+new Chart(document.getElementById("chartRingkasan"), {
+  type: "bar",
+  data: {
+    labels: ["PW1 (/25)","PW2 (/25)","PW3 (/25)","Presentation (/25)","Case Study (/50)","PBA (/25)"],
+    datasets: [{
+      label: "Purata Markah",
+      data: [22.4, 20.0, 23.8, 21.4, 34.0, 20.0],
+      backgroundColor: COLORS.slice(0,6),
+      borderRadius: 6
+    }]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
+});
+
+new Chart(document.getElementById("chartLulus"), {
+  type: "bar",
+  data: {
+    labels: ["PW1","PW2","PW3","Presentation","Case Study","PBA"],
+    datasets: [
+      { label:"Lulus ≥50%", data:[10,10,10,10,8,10], backgroundColor:"#16a34a", borderRadius:4 },
+      { label:"Gagal <50%", data:[0,0,0,0,2,0], backgroundColor:"#ef4444", borderRadius:4 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:"bottom"} }, scales:{ x:{stacked:true}, y:{stacked:true, max:10, beginAtZero:true} } }
+});
+
+new Chart(document.getElementById("chartCA"), {
+  type: "bar",
+  data: {
+    labels: students.map(s => s.name.split(" ")[0]),
+    datasets: [{ label:"Jumlah CA /70", data: students.map(s=>s.ca), backgroundColor: students.map(s=> s.total>=80?"#16a34a":s.total>=70?"#2563a8":s.total>=50?"#ea580c":"#ef4444"), borderRadius:4 }]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,max:70}} }
+});
+
+// Tab 2 – Komponen
+new Chart(document.getElementById("chartPie"), {
+  type: "doughnut",
+  data: {
+    labels: ["Practical Work (30%)", "Presentation (10%)", "Case Study (15%)", "Problem Based Assignment (15%)"],
+    datasets: [{ data:[30,10,15,15], backgroundColor:["#2563a8","#16a34a","#ea580c","#7c3aed"], borderWidth:2 }]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:"bottom", labels:{font:{size:11}}} } }
+});
+
+new Chart(document.getElementById("chartKomponen"), {
+  type: "bar",
+  data: {
+    labels: ["PW1 (/25)","PW2 (/25)","PW3 (/25)","Presentation (/25)","Case Study (/50)","PBA (/25)"],
+    datasets: [
+      { label:"Purata", data:[22.4,20.0,23.8,21.4,34.0,20.0], backgroundColor:COLORS.slice(0,6), borderRadius:5 },
+      { label:"Skor Penuh", data:[25,25,25,25,50,25], backgroundColor:LIGHT.slice(0,6), borderRadius:5 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"bottom"}}, scales:{y:{beginAtZero:true}} }
+});
+
+// Tab 3 – Prestasi Pelajar
+const tbody3 = document.getElementById("tbodyPrestasi");
+students.forEach((s,i) => {
+  const g = getGrade(s.total); const st = getStatus(s.total);
+  tbody3.innerHTML += `<tr>
+    <td>${s.no}</td><td>${s.name}</td><td style="font-size:11px">${s.matric}</td>
+    <td>${s.pw1}</td><td>${s.pw2}</td><td>${s.pw3}</td><td>${s.pr1}</td>
+    <td>${s.cs1}</td><td>${s.pba1}</td><td><strong>${s.ca}</strong></td>
+    <td><strong>${s.total}</strong></td>
+    <td><span class="badge badge-${g}">${g}</span></td>
+  </tr>`;
+});
+
+new Chart(document.getElementById("chartPelajar"), {
+  type: "bar",
+  data: {
+    labels: students.map(s => s.name.split(" ").slice(0,2).join(" ")),
+    datasets: [{
+      label:"Jumlah Markah /100",
+      data: students.map(s=>s.total),
+      backgroundColor: students.map(s=> s.total>=80?"#16a34a":s.total>=70?"#2563a8":s.total>=50?"#ea580c":"#ef4444"),
+      borderRadius:5
+    }]
+  },
+  options: {
+    indexAxis:"y", responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{ x:{beginAtZero:true,max:100, ticks:{stepSize:10}} }
+  }
+});
+
+// Tab 4 – CLO
+new Chart(document.getElementById("chartCLO"), {
+  type:"bar",
+  data:{
+    labels:["CLO0101P\n(Practical Work)","CLO0102A\n(Presentation)","CLO0101P\n(Case Study)","CLO0103A\n(PBA)"],
+    datasets:[
+      { label:"Lulus ≥50%", data:[10,10,8,10], backgroundColor:["#2563a8","#16a34a","#ea580c","#7c3aed"], borderRadius:6 },
+      { label:"Gagal <50%", data:[0,0,2,0], backgroundColor:["#bfdbfe","#bbf7d0","#fed7aa","#ede9fe"], borderRadius:6 }
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{position:"bottom"}},
+    scales:{x:{stacked:true}, y:{stacked:true,max:10,beginAtZero:true}}
+  }
+});
+
+new Chart(document.getElementById("chartCSDetail"), {
+  type:"bar",
+  data:{
+    labels: students.map(s=>s.name.split(" ").slice(0,2).join(" ")),
+    datasets:[{
+      label:"Case Study Markah (/50)",
+      data: students.map(s=>s.cs1),
+      backgroundColor: students.map(s=>s.cs1>=25?"#16a34a":"#ef4444"),
+      borderRadius:4
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      annotation:{}
+    },
+    scales:{ y:{beginAtZero:true,max:50} }
+  }
+});
+
+// Tab 5 – Ranking
+const sorted = [...students].sort((a,b)=>b.total-a.total);
+const rankDiv = document.getElementById("rankingList");
+sorted.forEach((s,i) => {
+  const rank = i+1;
+  const g = getGrade(s.total); const st = getStatus(s.total);
+  let cls = ""; let medal = rank;
+  if(rank===1){cls="top1"; medal="🥇";}
+  else if(rank===2){cls="top2"; medal="🥈";}
+  else if(rank===3){cls="top3"; medal="🥉";}
+  else if(s.total<60){cls="low";}
+  rankDiv.innerHTML += `
+    <div class="rank-row ${cls}">
+      <div class="rank-num">${medal}</div>
+      <div>
+        <div class="rank-name">${s.name}</div>
+        <div class="rank-no">${s.matric} &nbsp;|&nbsp; ${s.sek}</div>
+      </div>
+      <div>
+        <div class="rank-score">${s.total}</div>
+        <div style="text-align:right"><span class="badge badge-${g}">${g}</span></div>
+      </div>
+    </div>`;
+});
+
+new Chart(document.getElementById("chartRanking"), {
+  type:"bar",
+  data:{
+    labels: sorted.map(s=>s.name.split(" ").slice(0,2).join(" ")),
+    datasets:[{
+      label:"Markah /100",
+      data: sorted.map(s=>s.total),
+      backgroundColor: sorted.map(s=>s.total>=80?"#16a34a":s.total>=70?"#2563a8":s.total>=50?"#ea580c":"#ef4444"),
+      borderRadius:5
+    }]
+  },
+  options:{
+    indexAxis:"y", responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{ x:{beginAtZero:true,max:100,ticks:{stepSize:10}} }
+  }
+});
+
+// Tab 6 – Taburan Gred
+new Chart(document.getElementById("chartGred"), {
+  type:"bar",
+  data:{
+    labels:["A (80–100)","B (70–79)","C (60–69)","D (50–59)","E (<50)"],
+    datasets:[{
+      label:"Bilangan Pelajar",
+      data:[6,2,0,2,0],
+      backgroundColor:["#16a34a","#2563a8","#ca8a04","#ea580c","#ef4444"],
+      borderRadius:6
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{y:{beginAtZero:true,max:10,ticks:{stepSize:1}}}
+  }
+});
+
+new Chart(document.getElementById("chartGredPie"), {
+  type:"doughnut",
+  data:{
+    labels:["A (80–100) – 6","B (70–79) – 2","C (60–69) – 0","D (50–59) – 2","E (<50) – 0"],
+    datasets:[{
+      data:[6,2,0,2,0],
+      backgroundColor:["#16a34a","#2563a8","#ca8a04","#ea580c","#ef4444"],
+      borderWidth:2
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{position:"bottom",labels:{font:{size:11}}}}
+  }
+});
+
+const tbody6 = document.getElementById("tbodyGred");
+students.forEach(s=>{
+  const g=getGrade(s.total); const st=getStatus(s.total);
+  tbody6.innerHTML += `<tr>
+    <td>${s.no}</td><td>${s.name}</td>
+    <td><strong>${s.total}</strong></td>
+    <td><span class="badge badge-${g}">${g}</span></td>
+    <td><span class="badge badge-${g}">${st.text}</span></td>
+  </tr>`;
+});
+</script>
+
+<!-- ══════════════ CHATBOT ══════════════ -->
+<style>
+  /* Floating button */
+  #chatbot-toggle {
+    position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #2563a8; color: #fff; border: none; cursor: pointer;
+    font-size: 24px; box-shadow: 0 4px 16px rgba(37,99,168,.45);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .2s, background .2s;
+  }
+  #chatbot-toggle:hover { background: #1a3a5c; transform: scale(1.08); }
+
+  /* Chat window */
+  #chatbot-window {
+    position: fixed; bottom: 96px; right: 28px; z-index: 9998;
+    width: 360px; max-height: 520px; display: none; flex-direction: column;
+    background: #fff; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.18); border: 1px solid #e5e7eb;
+  }
+  #chatbot-window.open { display: flex; }
+
+  /* Header */
+  #chat-header {
+    background: linear-gradient(135deg, #1a3a5c, #2563a8);
+    color: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 10px;
+  }
+  #chat-header .avatar { width:36px; height:36px; border-radius:50%; background:#fff2; display:flex; align-items:center; justify-content:center; font-size:18px; }
+  #chat-header .info .name { font-weight:700; font-size:14px; }
+  #chat-header .info .status { font-size:11px; opacity:.8; }
+  #chat-close { margin-left:auto; background:none; border:none; color:#fff; font-size:20px; cursor:pointer; opacity:.8; }
+  #chat-close:hover { opacity:1; }
+
+  /* Messages */
+  #chat-messages {
+    flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px;
+    background: #f7f8fa;
+  }
+  .msg { max-width: 88%; padding: 10px 13px; border-radius: 12px; font-size: 13px; line-height: 1.5; word-break: break-word; }
+  .msg.bot { background: #fff; border: 1px solid #e5e7eb; border-bottom-left-radius: 3px; align-self: flex-start; color: #1f2328; }
+  .msg.user { background: #2563a8; color: #fff; border-bottom-right-radius: 3px; align-self: flex-end; }
+  .msg.bot strong { color: #1a3a5c; }
+
+  /* Quick replies */
+  #quick-replies { padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 6px; background: #f7f8fa; border-top: 1px solid #e5e7eb; }
+  .qr-btn {
+    font-size: 11px; padding: 5px 10px; border-radius: 999px;
+    border: 1px solid #2563a8; color: #2563a8; background: #fff;
+    cursor: pointer; white-space: nowrap; transition: all .15s;
+  }
+  .qr-btn:hover { background: #2563a8; color: #fff; }
+
+  /* Input */
+  #chat-input-row { display: flex; padding: 10px 12px; gap: 8px; border-top: 1px solid #e5e7eb; background: #fff; }
+  #chat-input {
+    flex:1; border: 1px solid #d1d5db; border-radius: 999px; padding: 8px 14px;
+    font-size: 13px; outline: none; font-family: inherit;
+  }
+  #chat-input:focus { border-color: #2563a8; }
+  #chat-send {
+    width:36px; height:36px; border-radius:50%; background:#2563a8; color:#fff;
+    border:none; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  #chat-send:hover { background:#1a3a5c; }
+</style>
+
+<!-- Toggle button -->
+<button id="chatbot-toggle" title="Buka Chatbot" onclick="toggleChat()">💬</button>
+
+<!-- Chat window -->
+<div id="chatbot-window">
+  <div id="chat-header">
+    <div class="avatar">🤖</div>
+    <div class="info">
+      <div class="name">EduBot</div>
+      <div class="status">Pembantu Dashboard DFN40543</div>
+    </div>
+    <button id="chat-close" onclick="toggleChat()" title="Tutup">✕</button>
+  </div>
+
+  <div id="chat-messages">
+    <div class="msg bot">👋 Salam! Saya <strong>EduBot</strong>, pembantu digital untuk dashboard kursus <strong>Enterprise Network (DFN40543)</strong>.<br><br>Anda boleh tanya saya tentang pelajar, markah, gred, atau statistik kelas. Cuba tanya sesuatu! 😊</div>
+  </div>
+
+  <div id="quick-replies">
+    <button class="qr-btn" onclick="sendQuick('Siapa pelajar terbaik?')">🏆 Pelajar terbaik</button>
+    <button class="qr-btn" onclick="sendQuick('Berapa purata markah?')">📊 Purata markah</button>
+    <button class="qr-btn" onclick="sendQuick('Berapa pelajar lulus?')">✅ Lulus/Gagal</button>
+    <button class="qr-btn" onclick="sendQuick('Siapa pelajar lemah?')">⚠️ Pelajar lemah</button>
+    <button class="qr-btn" onclick="sendQuick('Taburan gred?')">📉 Taburan gred</button>
+    <button class="qr-btn" onclick="sendQuick('Markah case study?')">📋 Case Study</button>
+  </div>
+
+  <div id="chat-input-row">
+    <input id="chat-input" type="text" placeholder="Taip soalan anda..." onkeydown="if(event.key==='Enter') sendMsg()" />
+    <button id="chat-send" onclick="sendMsg()" title="Hantar">➤</button>
+  </div>
+</div>
+
+<script>
+// ══════════════ CHATBOT ENGINE ══════════════
+function toggleChat() {
+  const w = document.getElementById("chatbot-window");
+  w.classList.toggle("open");
+  if (w.classList.contains("open")) document.getElementById("chat-input").focus();
+}
+
+function sendQuick(text) {
+  document.getElementById("chat-input").value = text;
+  sendMsg();
+}
+
+function sendMsg() {
+  const inp = document.getElementById("chat-input");
+  const text = inp.value.trim();
+  if (!text) return;
+  addMsg(text, "user");
+  inp.value = "";
+  setTimeout(() => { addMsg(getBotReply(text), "bot"); }, 350);
+}
+
+function addMsg(html, type) {
+  const box = document.getElementById("chat-messages");
+  const div = document.createElement("div");
+  div.className = "msg " + type;
+  div.innerHTML = html;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ══════════════ KNOWLEDGE BASE ══════════════
+function getBotReply(q) {
+  const Q = q.toLowerCase().replace(/[?!.,]/g,"");
+
+  const avg = s => (s.reduce((a,b)=>a+b,0)/s.length).toFixed(1);
+  const sorted = [...students].sort((a,b)=>b.total-a.total);
+  const totalStudents = students.length;
+
+  // ── Salam / sapaan
+  if (/^(hi|hello|salam|hai|assalam|helo|apa khabar)/.test(Q))
+    return "Wa'alaikumussalam! 😊 Saya siap membantu anda. Apa yang anda ingin tahu tentang kelas ini?";
+
+  // ── Terima kasih
+  if (/(terima kasih|thanks|thank you|tq|ok terima|syukran)/.test(Q))
+    return "Sama-sama! 😊 Jika ada soalan lain, saya sedia membantu.";
+
+  // ── Info kursus
+  if (/(kursus|subject|matapelajaran|nama kursus|kod kursus|dfn)/.test(Q))
+    return `📚 <strong>Maklumat Kursus:</strong><br>
+    • Kod: <strong>DFN40543</strong><br>
+    • Nama: <strong>Enterprise Network</strong><br>
+    • Program: <strong>DIT</strong> | Seksyen: <strong>S5</strong><br>
+    • Pensyarah: <strong>Shahrul Nazmi Bin Ismail</strong><br>
+    • Sesi: <strong>II / 2025-2026</strong>`;
+
+  // ── Pensyarah
+  if (/(pensyarah|lecturer|cikgu|guru|siapa ajar|siapa mengajar)/.test(Q))
+    return "👨‍🏫 Pensyarah kursus ini ialah <strong>Shahrul Nazmi Bin Ismail</strong> dari Jabatan Teknologi Maklumat dan Komunikasi, Politeknik Balik Pulau.";
+
+  // ── Bilangan pelajar
+  if (/(berapa pelajar|jumlah pelajar|bilangan pelajar|ramai pelajar|how many student)/.test(Q))
+    return `👥 Terdapat <strong>${totalStudents} orang pelajar</strong> dalam kelas ini (Seksyen S5, Program DIT).`;
+
+  // ── Pelajar terbaik / tertinggi
+  if (/(terbaik|tertinggi|top|ranking 1|nombor 1|no[.]?1|cemerlang|highest|best)/.test(Q)) {
+    const top = sorted.slice(0,2);
+    return `🏆 <strong>Pelajar Terbaik:</strong><br>
+    🥇 <strong>${top[0].name}</strong> — <strong>${top[0].total}/100</strong> (Gred A)<br>
+    🥈 <strong>${top[1].name}</strong> — <strong>${top[1].total}/100</strong> (Gred A)<br><br>
+    Kedua-dua pelajar mendapat markah <strong>90/100</strong>! 🎉`;
+  }
+
+  // ── Pelajar lemah / terendah / perhatian
+  if (/(lemah|terendah|lowest|rendah|perhatian|bimbang|gagal|fail|perlu dipantau)/.test(Q)) {
+    const low = sorted.slice(-2).reverse();
+    return `⚠️ <strong>Pelajar yang perlu perhatian (markah terendah):</strong><br>
+    • <strong>${low[0].name}</strong> — ${low[0].total}/100 (Gred ${getGrade(low[0].total)})<br>
+    • <strong>${low[1].name}</strong> — ${low[1].total}/100 (Gred ${getGrade(low[1].total)})<br><br>
+    Namun, kedua-dua masih <strong>lulus</strong>. Tiada pelajar yang gagal dalam kelas ini. ✅`;
+  }
+
+  // ── Purata markah
+  if (/(purata|average|min markah|markah purata|purata markah|mean)/.test(Q)) {
+    const pu = (students.reduce((a,s)=>a+s.total,0)/students.length).toFixed(1);
+    return `📊 <strong>Purata Markah Keseluruhan:</strong> <strong>${pu}/100</strong><br><br>
+    Purata setiap komponen:<br>
+    • PW1: <strong>22.4/25</strong><br>
+    • PW2: <strong>20.0/25</strong><br>
+    • PW3: <strong>23.8/25</strong><br>
+    • Presentation: <strong>21.4/25</strong><br>
+    • Case Study: <strong>34.0/50</strong><br>
+    • PBA: <strong>20.0/25</strong>`;
+  }
+
+  // ── Lulus / gagal
+  if (/(lulus|pass|gagal|fail|pencapaian keseluruhan)/.test(Q)) {
+    const lulus = students.filter(s=>s.total>=50).length;
+    return `✅ <strong>Status Kelulusan:</strong><br>
+    • Lulus (≥50): <strong>${lulus}/${totalStudents} pelajar (${(lulus/totalStudents*100).toFixed(0)}%)</strong><br>
+    • Gagal (<50): <strong>0 pelajar</strong><br><br>
+    🎊 Semua pelajar <strong>lulus</strong> kursus ini!`;
+  }
+
+  // ── Taburan gred
+  if (/(taburan|gred|grade|distribution|a b c|markah tinggi)/.test(Q)) {
+    const A=students.filter(s=>s.total>=80).length;
+    const B=students.filter(s=>s.total>=70&&s.total<80).length;
+    const C=students.filter(s=>s.total>=60&&s.total<70).length;
+    const D=students.filter(s=>s.total>=50&&s.total<60).length;
+    const E=students.filter(s=>s.total<50).length;
+    return `📉 <strong>Taburan Gred Pelajar:</strong><br>
+    • 🟢 Gred A (80–100): <strong>${A} pelajar</strong><br>
+    • 🔵 Gred B (70–79): <strong>${B} pelajar</strong><br>
+    • 🟡 Gred C (60–69): <strong>${C} pelajar</strong><br>
+    • 🟠 Gred D (50–59): <strong>${D} pelajar</strong><br>
+    • 🔴 Gred E (<50): <strong>${E} pelajar</strong>`;
+  }
+
+  // ── Case Study
+  if (/(case study|kajian kes|cs1|cs )/.test(Q)) {
+    const csAvg = (students.reduce((a,s)=>a+s.cs1,0)/students.length).toFixed(1);
+    const csLulus = students.filter(s=>s.cs1>=25).length;
+    const csGagal = students.filter(s=>s.cs1<25).map(s=>s.name.split(" ")[0]);
+    return `📋 <strong>Analisis Case Study:</strong><br>
+    • Purata: <strong>${csAvg}/50</strong><br>
+    • Lulus (≥50%): <strong>${csLulus}/${totalStudents} pelajar</strong><br>
+    • Perlu perhatian: <strong>${csGagal.join(", ")}</strong> (markah < 25)<br><br>
+    ⚠️ Ini komponen yang paling mencabar — 2 pelajar tidak mencapai 50%.`;
+  }
+
+  // ── Practical Work
+  if (/(practical|pw|praktikal|amali)/.test(Q)) {
+    return `🔧 <strong>Markah Practical Work:</strong><br>
+    • PW1 — Purata: <strong>22.4/25</strong> | Semua lulus ✅<br>
+    • PW2 — Purata: <strong>20.0/25</strong> | Semua lulus ✅<br>
+    • PW3 — Purata: <strong>23.8/25</strong> | Semua lulus ✅<br><br>
+    Weightage keseluruhan Practical Work: <strong>30%</strong>`;
+  }
+
+  // ── Presentation
+  if (/(presentation|present|persembahan|pr1|pr )/.test(Q)) {
+    const prAvg = (students.reduce((a,s)=>a+s.pr1,0)/students.length).toFixed(1);
+    return `🎤 <strong>Markah Presentation 1:</strong><br>
+    • Purata: <strong>${prAvg}/25</strong><br>
+    • Semua pelajar lulus ✅<br>
+    • Weightage: <strong>10%</strong>`;
+  }
+
+  // ── PBA / Problem Based
+  if (/(pba|problem based|tugasan|assignment)/.test(Q)) {
+    return `📝 <strong>Problem Based Assignment (PBA):</strong><br>
+    • Semua pelajar mendapat: <strong>20/25</strong><br>
+    • Purata: <strong>20.0/25</strong> | Semua lulus ✅<br>
+    • Weightage: <strong>15%</strong>`;
+  }
+
+  // ── CLO
+  if (/(clo|course learning|learning outcome|hasil pembelajaran)/.test(Q))
+    return `📊 <strong>Pencapaian CLO:</strong><br>
+    • CLO0101P (Practical): <strong>10/10 pelajar</strong> capai ✅<br>
+    • CLO0102A (Presentation): <strong>10/10 pelajar</strong> capai ✅<br>
+    • CLO0101P (Case Study): <strong>8/10 pelajar</strong> capai ⚠️<br>
+    • CLO0103A (PBA): <strong>10/10 pelajar</strong> capai ✅`;
+
+  // ── Markah pelajar spesifik
+  for (const s of students) {
+    const fname = s.name.split(" ")[0].toLowerCase();
+    const lname = s.name.split(" ").pop().toLowerCase();
+    const matric = s.matric.toLowerCase();
+    if (Q.includes(fname) || Q.includes(lname) || Q.includes(matric) || Q.includes(s.matric.slice(-4).toLowerCase())) {
+      const g = getGrade(s.total);
+      return `👤 <strong>${s.name}</strong><br>
+      No. Matrik: ${s.matric}<br>
+      • PW1: ${s.pw1}/25 &nbsp;|&nbsp; PW2: ${s.pw2}/25 &nbsp;|&nbsp; PW3: ${s.pw3}/25<br>
+      • Presentation: ${s.pr1}/25<br>
+      • Case Study: ${s.cs1}/50<br>
+      • PBA: ${s.pba1}/25<br>
+      • CA: <strong>${s.ca}/70</strong><br>
+      • <strong>Total: ${s.total}/100 (Gred ${g})</strong>`;
+    }
+  }
+
+  // ── Seksyen
+  if (/(seksyen|section|s5a|s5b|kumpulan)/.test(Q)) {
+    const s5a = students.filter(s=>s.sek==="S5A").length;
+    const s5b = students.filter(s=>s.sek==="S5B").length;
+    return `🏫 <strong>Pecahan Seksyen:</strong><br>
+    • Seksyen S5A: <strong>${s5a} pelajar</strong><br>
+    • Seksyen S5B: <strong>${s5b} pelajar</strong><br>
+    • Jumlah: <strong>${totalStudents} pelajar</strong>`;
+  }
+
+  // ── Semua pelajar
+  if (/(senarai|list|semua pelajar|nama pelajar|pelajar seksyen|siapa pelajar)/.test(Q)) {
+    const list = sorted.map((s,i)=>`${i+1}. <strong>${s.name}</strong> — ${s.total}/100 (${getGrade(s.total)})`).join("<br>");
+    return `👥 <strong>Senarai Pelajar (mengikut ranking):</strong><br>${list}`;
+  }
+
+  // ── Weightage / peratusan
+  if (/(weightage|peratus|penilaian|pecahan markah|agihan|wajaran)/.test(Q))
+    return `⚖️ <strong>Agihan Penilaian:</strong><br>
+    • Practical Work: <strong>30%</strong><br>
+    • Presentation: <strong>10%</strong><br>
+    • Case Study: <strong>15%</strong><br>
+    • Problem Based Assignment: <strong>15%</strong><br>
+    • (Final Exam: 30% — tidak dalam rekod ini)`;
+
+  // ── Markah tertinggi / terendah
+  if (/(markah tertinggi|highest mark|skor tertinggi)/.test(Q))
+    return `⬆️ Markah tertinggi ialah <strong>90/100</strong>, dicapai oleh:<br>🥇 <strong>${sorted[0].name}</strong><br>🥈 <strong>${sorted[1].name}</strong>`;
+  if (/(markah terendah|lowest mark|skor terendah)/.test(Q))
+    return `⬇️ Markah terendah ialah <strong>${sorted[sorted.length-1].total}/100</strong>, dicapai oleh pelajar seperti <strong>${sorted[sorted.length-1].name}</strong> dan <strong>${sorted[sorted.length-2].name}</strong>. Namun mereka masih lulus.`;
+
+  // ── Default fallback
+  return `🤔 Maaf, saya tidak faham soalan itu sepenuhnya. Cuba tanya seperti:<br><br>
+  • <em>"Siapa pelajar terbaik?"</em><br>
+  • <em>"Berapa purata markah?"</em><br>
+  • <em>"Markah Vagish berapa?"</em><br>
+  • <em>"Taburan gred?"</em><br>
+  • <em>"Berapa pelajar lulus?"</em><br>
+  • <em>"Markah case study?"</em>`;
+}
+
+// ══════════════ REPORTING FUNCTIONS ══════════════
+
+// 🖨️ PRINT — tunjuk semua tab, cetak, kembalikan semula
+function doPrint() {
+  // Tunjukkan semua tab-panel untuk print
+  const panels = document.querySelectorAll(".tab-panel");
+  const hidden = [];
+  panels.forEach(p => {
+    if (!p.classList.contains("active")) {
+      p.style.display = "block";
+      hidden.push(p);
+    }
+  });
+  window.print();
+  // Pulihkan semula selepas dialog print ditutup
+  hidden.forEach(p => { p.style.display = ""; });
+}
+
+// 📸 EXPORT PNG — tangkap tab yang aktif sahaja
+function doExportPNG() {
+  const btn = document.getElementById("btnPng");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="icon">⏳</span> Proses...';
+
+  const activePanel = document.querySelector(".tab-panel.active");
+  const tabLabel = document.querySelector(".tab-btn.active").textContent.trim().replace(/[^\w\s]/g,"").trim();
+  const filename = "Dashboard_DFN40543_" + tabLabel.replace(/\s+/g,"-") + ".png";
+
+  html2canvas(activePanel, {
+    scale: 2,
+    backgroundColor: "#f0f4f8",
+    useCORS: true,
+    logging: false
+  }).then(canvas => {
+    const link = document.createElement("a");
+    link.download = filename;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+    btn.disabled = false;
+    btn.innerHTML = '<span class="icon">📸</span> PNG';
+  }).catch(() => {
+    alert("Gagal export PNG. Sila pastikan sambungan internet aktif.");
+    btn.disabled = false;
+    btn.innerHTML = '<span class="icon">📸</span> PNG';
+  });
+}
+
+// 📄 EXPORT PDF — tangkap semua tab satu persatu, gabung dalam PDF
+async function doExportPDF() {
+  const btn = document.getElementById("btnPdf");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="icon">⏳</span> Jana PDF...';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+
+    const tabIds   = ["ringkasan","komponen","prestasi","clo","ranking","gred"];
+    const tabBtns  = document.querySelectorAll(".tab-btn");
+    const panels   = document.querySelectorAll(".tab-panel");
+
+    // Simpan tab aktif semasa
+    const activeBtn   = document.querySelector(".tab-btn.active");
+    const activePanel = document.querySelector(".tab-panel.active");
+
+    for (let i = 0; i < tabIds.length; i++) {
+      // Aktifkan tab yang akan dicapture
+      tabBtns.forEach(b => b.classList.remove("active"));
+      panels.forEach(p => { p.classList.remove("active"); p.style.display = "none"; });
+      tabBtns[i].classList.add("active");
+      panels[i].classList.add("active");
+      panels[i].style.display = "block";
+
+      // Tunggu chart render
+      await new Promise(r => setTimeout(r, 300));
+
+      const canvas = await html2canvas(panels[i], {
+        scale: 1.5,
+        backgroundColor: "#f0f4f8",
+        useCORS: true,
+        logging: false
+      });
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+      const ratio = Math.min(pdfW / imgW, pdfH / imgH);
+
+      if (i > 0) pdf.addPage();
+
+      // Header ring dalam PDF
+      pdf.setFillColor(26, 58, 92);
+      pdf.rect(0, 0, pdfW, 10, "F");
+      pdf.setTextColor(255,255,255);
+      pdf.setFontSize(8);
+      pdf.text("POLITEKNIK BALIK PULAU  |  DFN40543 Enterprise Network  |  Sesi II 2025/2026", 5, 7);
+      pdf.text(`Tab ${i+1}/6: ${tabBtns[i].textContent.trim()}`, pdfW - 5, 7, { align:"right" });
+
+      pdf.addImage(imgData, "JPEG", 0, 11, imgW * ratio, imgH * ratio);
+    }
+
+    // Pulihkan tab asal
+    tabBtns.forEach(b => b.classList.remove("active"));
+    panels.forEach(p => { p.classList.remove("active"); p.style.display = ""; });
+    activeBtn.classList.add("active");
+    activePanel.classList.add("active");
+
+    pdf.save("Laporan_Pentaksiran_DFN40543.pdf");
+  } catch(e) {
+    alert("Gagal jana PDF. Sila pastikan sambungan internet aktif.");
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="icon">📄</span> PDF';
+}
+</script>
+</body>
+</html>
